@@ -3,7 +3,7 @@ import java.time.format.DateTimeFormatter;
 
 public class MedicionSonora {
 
-	private Integer promedioMedicion;
+	private double promedioMedicion;
 	private LocalDateTime fechaHoraMedicion;
 	
 	public MedicionSonora() {
@@ -14,7 +14,7 @@ public class MedicionSonora {
 	public MedicionSonora(String promedioMedicion,
 			String fechaHoraMedicion) {
 		super();
-		this.promedioMedicion = Integer.parseInt(promedioMedicion);
+		this.promedioMedicion = Double.parseDouble(promedioMedicion);
 		DateTimeFormatter formatterHH = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 		DateTimeFormatter formatterH = DateTimeFormatter.ofPattern("dd/MM/yyyy H:mm");
 
@@ -27,10 +27,10 @@ public class MedicionSonora {
 	}
 	
 
-	public Integer getPromedioMedicion() {
+	public double getPromedioMedicion() {
 		return promedioMedicion;
 	}
-	public void setPromedioMedicion(Integer promedioMedicion) {
+	public void setPromedioMedicion(double promedioMedicion) {
 		this.promedioMedicion = promedioMedicion;
 	}
 	public LocalDateTime getFechaHoraMedicion() {
