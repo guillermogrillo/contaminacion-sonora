@@ -1,4 +1,6 @@
+import java.io.FileReader;
 import java.io.IOException;
+import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -10,18 +12,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
 
 public class ContaminacionSonora {
 	
 	public static void main(String[] args) throws IOException {
 
 		System.out.println("Comienza la carga de torres de medicion");
-		Stream<String> torres = Files.lines(Paths.get("src/main/resources/estaciones/torres-de-monitoreo-inteligente.csv")).skip(1);
-		Map<String, TorreMedicion> mapaTorres =
-				torres.map(line -> line.split(","))
-						.collect(Collectors.toMap(line -> line[0], line -> new TorreMedicion(line[1],line[2])));
+		Reader in = new FileReader("src/main/resources/estaciones/torres-de-monitoreo-inteligente.csv");
+		Iterable<CSVRecord> records = CSVFormat.DEFAULT.withHeader().parse(in);
+		Map<String, TorreMedicion> mapaTorres = new HashMap<>();
+		records.forEach(record -> mapaTorres.put(record.get("TMI"), new TorreMedicion(record.get("BARRIO"), record.get("DIRECCION"))));
 		System.out.println("Finaliza la carga de torres de medicion");
-
 
 		Map<String, List<MedicionSonora>> mapaMediciones = new HashMap<>();
 
