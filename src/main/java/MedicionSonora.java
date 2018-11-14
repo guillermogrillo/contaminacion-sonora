@@ -11,10 +11,10 @@ public class MedicionSonora {
 	}
 	
 	
-	public MedicionSonora(Integer promedioMedicion,
+	public MedicionSonora(String promedioMedicion,
 			String fechaHoraMedicion) {
 		super();
-		this.promedioMedicion = promedioMedicion;
+		this.promedioMedicion = Integer.parseInt(promedioMedicion);
 		DateTimeFormatter formatterHH = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 		DateTimeFormatter formatterH = DateTimeFormatter.ofPattern("dd/MM/yyyy H:mm");
 
