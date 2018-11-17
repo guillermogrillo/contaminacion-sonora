@@ -49,16 +49,12 @@ public class ContaminacionSonora {
         System.out.println("Medicion promedio tarde/noche en Almagro: " + (sumMedicionesTardeNoche/countMedicionesTardeNoche));
 
         
-        //no se como hacer esto bien
-        double[] puntos = new double[medicionSonoras.size()];
-        for (int i = 0; i < puntos.length; i++) {
-           puntos[i] = medicionSonoras.get(i).getPromedioMedicion();
-        }
+        double[] mediciones = medicionSonoras.stream().mapToDouble(medicion->medicion.getPromedioMedicion()).toArray();
         
         TimeSeries ts = TimeSeries.from(
         		TimePeriod.oneHour(),
         		medicionSonoras.stream().map(medicion -> medicion.getFechaHoraMedicion().atOffset(ZoneOffset.UTC)).collect(Collectors.toList()),
-        		puntos
+                mediciones
         		);
 
         System.out.println("Medicion promedio en Almagro: " + (ts.mean()));
