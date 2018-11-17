@@ -1,28 +1,33 @@
+import com.github.signaflo.data.visualization.Plots;
+import com.github.signaflo.timeseries.TimePeriod;
+import com.github.signaflo.timeseries.TimeSeries;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVRecord;
+
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.DayOfWeek;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVRecord;
-
-import com.github.signaflo.timeseries.TimeSeries;
-import com.github.signaflo.timeseries.forecast.Forecast;
-import com.github.signaflo.timeseries.TimePeriod;
-import com.github.signaflo.data.visualization.Plots;
 
 public class ContaminacionSonora {
-	
-	public static void main(String[] args) throws IOException {
+
+    public static String ID_ALMAGRO = "1305";
+    public static String ID_BALVANERA = "1304";
+    public static String ID_PALERMO = "1313";
+    public static String ID_RECOLETA = "1314";
+    public static String ID_CABALLITO = "1315";
+    public static String ID_FLORES = "1316";
+    public static String ID_CENTRO = "1318";
+
+    public static void main(String[] args) throws IOException {
 
 		System.out.println("Comienza la carga de torres de medicion");
 		Reader in = new FileReader("src/main/resources/estaciones/torres-de-monitoreo-inteligente.csv");
@@ -39,30 +44,207 @@ public class ContaminacionSonora {
 		
 		System.out.println("Finaliza la carga de los archivos");
 
-        //ejemplo. 1305 es almagro
-        List<MedicionSonora> medicionSonoras = mapaTorres.get("1295").getMediciones();
-        List<MedicionSonora> medicionesTardeNoche = medicionSonoras.stream().filter(medicionSonora ->
-                medicionSonora.getFechaHoraMedicion().getHour() > 18 || medicionSonora.getFechaHoraMedicion().getHour() < 7)
-                .collect(Collectors.toList()); //mediciones con hora despues de las 18 hasta las 7 de la mañana (tarde/noche)
-        double sumMedicionesTardeNoche = medicionesTardeNoche.stream().mapToDouble(MedicionSonora::getPromedioMedicion).sum();
-        int countMedicionesTardeNoche = medicionesTardeNoche.size();
-        System.out.println("Medicion promedio tarde/noche en Almagro: " + (sumMedicionesTardeNoche/countMedicionesTardeNoche));
+        //Explicar el caso del centro de lunes a viernes de 9 a 18
+        horarioLaboralCentro(mapaTorres);
+        //Explicar el caso de barrios aledaños al centro de 18 a 19
+        postTrabajoCercaDelCentro(mapaTorres);
+        //Explicar el caso de períodos vacacionales en el centro
+        vacacionesEnElCentro(mapaTorres);
+        //Estudiar el caso de las distintas estaciones del año, para ver sí hay algo particular.
+        veranoVsInvierno(mapaTorres);
+        //Estudiar el caso de navidad y año nuevo, puntualmente a las 12, por la pirotecnia.
+        fiestasEnBarrios(mapaTorres);
 
-        
-        double[] mediciones = medicionSonoras.stream().mapToDouble(medicion->medicion.getPromedioMedicion()).toArray();
-        
-        TimeSeries ts = TimeSeries.from(
-        		TimePeriod.oneHour(),
-        		medicionSonoras.stream().map(medicion -> medicion.getFechaHoraMedicion().atOffset(ZoneOffset.UTC)).collect(Collectors.toList()),
+
+    }
+
+    private static void horarioLaboralCentro(Map<String, TorreMedicion> mapaTorres) {
+
+        List<MedicionSonora> medicionSonoras =
+                mapaTorres.get(ID_CENTRO)
+                    .getMediciones()
+                    .stream()
+                    .filter(ms ->
+                            (ms.getFechaHoraMedicion().getHour()>=9 && ms.getFechaHoraMedicion().getHour()<=18) &&
+                            ms.getFechaHoraMedicion().getDayOfWeek().getValue() != 6 && //excluimos los sabados
+                            ms.getFechaHoraMedicion().getDayOfWeek().getValue() != 7 && //excluimos los domingos
+                            ms.getPromedioMedicion() > 0) //excluimos posibles valores invalidos
+                    .collect(Collectors.toList());
+
+        TimeSeries ts = getTimeSeries(medicionSonoras);
+        System.out.println("--------------MEDICIONES TOMADAS EN EL CENTRO, EN HORARIOS LABORALES Y DIAS DE SEMANA ----------------------");
+        System.out.println("VALOR PROMEDIO: " + (ts.mean()));
+        System.out.println("MEDIA: " + (ts.median()));
+        System.out.println("DESVIO ESTANDAR: " + (ts.stdDeviation()));
+
+
+        Plots.plot(ts.aggregate(TimePeriod.oneHour()), "CENTRO-DIAS Y HORARIOS LABORALES", "Valor medido");
+    }
+
+    private static void postTrabajoCercaDelCentro(Map<String, TorreMedicion> mapaTorres) {
+
+        List<MedicionSonora> medicionSonoras =
+                mapaTorres.get(ID_BALVANERA)
+                        .getMediciones()
+                        .stream()
+                        .filter(ms ->
+                                (ms.getFechaHoraMedicion().getHour()<9 ||
+                                        ms.getFechaHoraMedicion().getHour()>18) &&
+                                        ms.getFechaHoraMedicion().getDayOfWeek().getValue() != 6 && //excluimos los sabados
+                                        ms.getFechaHoraMedicion().getDayOfWeek().getValue() != 7 && //excluimos los domingos
+                                        ms.getPromedioMedicion() > 0) //excluimos posibles valores invalidos
+                        .collect(Collectors.toList());
+
+        TimeSeries ts = getTimeSeries(medicionSonoras);
+        System.out.println("--------------MEDICIONES TOMADAS EN BALVANERA, FUERA DE HORARIOS LABORALES EN DIAS DE SEMANA ----------------------");
+        System.out.println("VALOR PROMEDIO: " + (ts.mean()));
+        System.out.println("MEDIA: " + (ts.median()));
+        System.out.println("DESVIO ESTANDAR: " + (ts.stdDeviation()));
+
+
+        Plots.plot(ts.aggregate(TimePeriod.oneHour()), "BALVANERA-DIAS LABORALES-HORARIOS NO LABORALES", "Valor medido");
+
+    }
+
+    private static void vacacionesEnElCentro(Map<String, TorreMedicion> mapaTorres) {
+        List<MedicionSonora> medicionSonorasEnVacaciones =
+                mapaTorres.get(ID_CENTRO)
+                        .getMediciones()
+                        .stream()
+                        .filter(ms ->
+                                (ms.getFechaHoraMedicion().getHour()>9 && ms.getFechaHoraMedicion().getHour()<18) &&
+                                ms.getFechaHoraMedicion().getMonth().getValue()<3 &&
+                                ms.getFechaHoraMedicion().getDayOfWeek().getValue() != 6 && //excluimos los sabados
+                                ms.getFechaHoraMedicion().getDayOfWeek().getValue() != 7 && //excluimos los domingos
+                                ms.getPromedioMedicion() > 0) //excluimos posibles valores invalidos
+                        .collect(Collectors.toList());
+
+        TimeSeries ts = getTimeSeries(medicionSonorasEnVacaciones);
+        System.out.println("--------------MEDICIONES TOMADAS EN EL CENTRO, EN HORARIOS LABORALES, DIAS DE SEMANA DE VACACIONES----------------------");
+        System.out.println("VALOR PROMEDIO: " + (ts.mean()));
+        System.out.println("MEDIA: " + (ts.median()));
+        System.out.println("DESVIO ESTANDAR: " + (ts.stdDeviation()));
+
+
+        Plots.plot(ts.aggregate(TimePeriod.oneHour()), "CENTRO-DIA Y HORARIO LABORAL-MESES DE VACACIONES (ENERO-FEBRERO)", "Valor medido");
+    }
+
+    private static void veranoVsInvierno(Map<String, TorreMedicion> mapaTorres) {
+        List<MedicionSonora> medicionSonorasVerano =
+                mapaTorres.get(ID_CENTRO)
+                        .getMediciones()
+                        .stream()
+                        .filter(ms ->
+                                (ms.getFechaHoraMedicion().getHour()>9 && ms.getFechaHoraMedicion().getHour()<18) &&
+                                        (ms.getFechaHoraMedicion().getMonth().getValue()<3 || ms.getFechaHoraMedicion().getMonth().getValue() == 12) &&
+                                        ms.getFechaHoraMedicion().getDayOfWeek().getValue() != 6 && //excluimos los sabados
+                                        ms.getFechaHoraMedicion().getDayOfWeek().getValue() != 7 && //excluimos los domingos
+                                        ms.getPromedioMedicion() > 0) //excluimos posibles valores invalidos
+                        .collect(Collectors.toList());
+
+        TimeSeries tsInvierno = getTimeSeries(medicionSonorasVerano);
+        System.out.println("--------------MEDICIONES TOMADAS EN EL CENTRO, EN HORARIOS LABORALES, DIAS DE SEMANA DE VERANO----------------------");
+        System.out.println("VALOR PROMEDIO: " + (tsInvierno.mean()));
+        System.out.println("MEDIA: " + (tsInvierno.median()));
+        System.out.println("DESVIO ESTANDAR: " + (tsInvierno.stdDeviation()));
+
+
+        Plots.plot(tsInvierno.aggregate(TimePeriod.oneHour()), "CENTRO-DIA Y HORARIO LABORAL-VERANO", "Valor medido");
+
+
+        List<MedicionSonora> medicionSonorasInvierno =
+                mapaTorres.get(ID_CENTRO)
+                        .getMediciones()
+                        .stream()
+                        .filter(ms ->
+                                (ms.getFechaHoraMedicion().getHour()>9 && ms.getFechaHoraMedicion().getHour()<18) &&
+                                        (ms.getFechaHoraMedicion().getMonth().getValue()<3 || ms.getFechaHoraMedicion().getMonth().getValue() == 12) &&
+                                        ms.getFechaHoraMedicion().getDayOfWeek().getValue() != 6 && //excluimos los sabados
+                                        ms.getFechaHoraMedicion().getDayOfWeek().getValue() != 7 && //excluimos los domingos
+                                        ms.getPromedioMedicion() > 0) //excluimos posibles valores invalidos
+                        .collect(Collectors.toList());
+
+        TimeSeries tsVerano = getTimeSeries(medicionSonorasInvierno);
+        System.out.println("--------------MEDICIONES TOMADAS CERCA DEL CENTRO, EN DE HORARIOS LABORALES, DIAS DE SEMANA DE INVIERNO----------------------");
+        System.out.println("VALOR PROMEDIO: " + (tsVerano.mean()));
+        System.out.println("MEDIA: " + (tsVerano.median()));
+        System.out.println("DESVIO ESTANDAR: " + (tsVerano.stdDeviation()));
+
+
+        Plots.plot(tsVerano.aggregate(TimePeriod.oneHour()), "CENTRO-DIA Y HORARIO LABORAL-INVIERNO", "Valor medido");
+
+
+    }
+
+    private static void fiestasEnBarrios(Map<String, TorreMedicion> mapaTorres) {
+        List<MedicionSonora> medicionSonorasFiestasCentro =
+                mapaTorres.get(ID_CENTRO)
+                        .getMediciones()
+                        .stream()
+                        .filter(ms ->
+                                (ms.getFechaHoraMedicion().getHour()==00) &&
+                                ms.getFechaHoraMedicion().getDayOfYear() == 1 &&
+                                ms.getPromedioMedicion() > 0)
+                        .collect(Collectors.toList());
+
+        TimeSeries tsCentro = getTimeSeries(medicionSonorasFiestasCentro);
+        System.out.println("--------------MEDICIONES TOMADAS EN EL CENTRO, EN AÑO NUEVO----------------------");
+        System.out.println("VALOR PROMEDIO: " + (tsCentro.mean()));
+        System.out.println("MEDIA: " + (tsCentro.median()));
+        System.out.println("DESVIO ESTANDAR: " + (tsCentro.stdDeviation()));
+
+
+        Plots.plot(tsCentro.aggregate(TimePeriod.oneHour()), "CENTRO-AÑO NUEVO", "Valor medido");
+
+
+        List<MedicionSonora> medicionSonorasFiestasCaballito =
+                mapaTorres.get(ID_CABALLITO)
+                        .getMediciones()
+                        .stream()
+                        .filter(ms ->
+                                (ms.getFechaHoraMedicion().getHour()==00) &&
+                                        ms.getFechaHoraMedicion().getDayOfYear() == 1 &&
+                                        ms.getPromedioMedicion() > 0)
+                        .collect(Collectors.toList());
+
+        TimeSeries tsCaballito = getTimeSeries(medicionSonorasFiestasCaballito);
+        System.out.println("--------------MEDICIONES TOMADAS EN CABALLITO, EN FIESTAS----------------------");
+        System.out.println("VALOR PROMEDIO: " + (tsCaballito.mean()));
+        System.out.println("MEDIA: " + (tsCaballito.median()));
+        System.out.println("DESVIO ESTANDAR: " + (tsCaballito.stdDeviation()));
+
+
+        Plots.plot(tsCaballito.aggregate(TimePeriod.oneHour()), "CABALLITO-AÑO NUEVO", "Valor medido");
+
+
+        List<MedicionSonora> medicionSonorasFiestasAlmagro =
+                mapaTorres.get(ID_ALMAGRO)
+                        .getMediciones()
+                        .stream()
+                        .filter(ms ->
+                                (ms.getFechaHoraMedicion().getHour()==00) &&
+                                        ms.getFechaHoraMedicion().getDayOfYear() == 1 &&
+                                        ms.getPromedioMedicion() > 0)
+                        .collect(Collectors.toList());
+
+        TimeSeries tsAlmagro = getTimeSeries(medicionSonorasFiestasAlmagro);
+        System.out.println("--------------MEDICIONES TOMADAS EN ALMAGRO, EN FIESTAS----------------------");
+        System.out.println("VALOR PROMEDIO: " + (tsAlmagro.mean()));
+        System.out.println("MEDIA: " + (tsAlmagro.median()));
+        System.out.println("DESVIO ESTANDAR: " + (tsAlmagro.stdDeviation()));
+
+
+        Plots.plot(tsAlmagro.aggregate(TimePeriod.oneHour()), "ALMAGRO-AÑO NUEVO", "Valor medido");
+    }
+
+    private static TimeSeries getTimeSeries(List<MedicionSonora> medicionSonoras) {
+        double[] mediciones = medicionSonoras.stream().mapToDouble(medicion -> medicion.getPromedioMedicion()).toArray();
+
+        return TimeSeries.from(
+                TimePeriod.oneHour(),
+                medicionSonoras.stream().map(medicion -> medicion.getFechaHoraMedicion().atOffset(ZoneOffset.UTC)).collect(Collectors.toList()),
                 mediciones
-        		);
-
-        System.out.println("Medicion promedio en Almagro: " + (ts.mean()));
-        System.out.println("Medicion media en Almagro: " + (ts.median()));
-        System.out.println("Desviacion estandar en Almagro: " + (ts.stdDeviation()));
-        
-        
-        Plots.plot(ts.aggregate(TimePeriod.oneWeek()));
+        );
     }
 
 	private static void cargarMediciones(Path f, Map<String, TorreMedicion> mapaTorres) {
@@ -77,7 +259,7 @@ public class ContaminacionSonora {
                     mapaTorres.get(record.get("TMI")).getMediciones().add(medicionSonora);
             	}
             });
-            
+
         } catch (IOException e) {
             System.out.println("Archivo no leido, siguiendo con el proximo");
         }
