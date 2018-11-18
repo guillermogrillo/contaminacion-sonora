@@ -39,6 +39,22 @@ public class MedicionSonora {
 	public void setFechaHoraMedicion(LocalDateTime fechaHoraMedicion) {
 		this.fechaHoraMedicion = fechaHoraMedicion;
 	}
+
+	public boolean isDiaDeSemana() {
+		return !(this.fechaHoraMedicion.getDayOfWeek().getValue()==6 || this.fechaHoraMedicion.getDayOfWeek().getValue()==7);
+	}
+
+	public boolean isHorarioLaboral(){
+		return (this.fechaHoraMedicion.getHour() >= 9 && this.fechaHoraMedicion.getHour()<=18);
+	}
+
+	public boolean isInvierno() {
+		return (this.fechaHoraMedicion.getMonth().getValue()==6 || this.fechaHoraMedicion.getMonth().getValue()==7 || this.fechaHoraMedicion.getMonth().getValue()==8);
+	}
+
+	public boolean isVerano() {
+		return (this.fechaHoraMedicion.getMonth().getValue()==12 || this.fechaHoraMedicion.getMonth().getValue()==1 || this.fechaHoraMedicion.getMonth().getValue()==2);
+	}
 	
 	
 	

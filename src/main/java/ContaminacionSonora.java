@@ -1,6 +1,8 @@
+import com.github.signaflo.data.regression.LinearRegression;
 import com.github.signaflo.data.visualization.Plots;
 import com.github.signaflo.timeseries.TimePeriod;
 import com.github.signaflo.timeseries.TimeSeries;
+import com.github.signaflo.timeseries.forecast.Forecast;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
 
@@ -47,38 +49,54 @@ public class ContaminacionSonora {
         //Explicar el caso del centro de lunes a viernes de 9 a 18
         horarioLaboralCentro(mapaTorres);
         //Explicar el caso de barrios aledaños al centro de 18 a 19
-        postTrabajoCercaDelCentro(mapaTorres);
+        //postTrabajoCercaDelCentro(mapaTorres);
         //Explicar el caso de períodos vacacionales en el centro
-        vacacionesEnElCentro(mapaTorres);
+        //vacacionesEnElCentro(mapaTorres);
         //Estudiar el caso de las distintas estaciones del año, para ver sí hay algo particular.
-        veranoVsInvierno(mapaTorres);
+        //veranoVsInvierno(mapaTorres);
         //Estudiar el caso de navidad y año nuevo, puntualmente a las 12, por la pirotecnia.
-        fiestasEnBarrios(mapaTorres);
+        //fiestasEnBarrios(mapaTorres);
 
 
     }
 
     private static void horarioLaboralCentro(Map<String, TorreMedicion> mapaTorres) {
 
-        List<MedicionSonora> medicionSonoras =
+        List<MedicionSonora> medicionSonorasHorarioLaboral =
                 mapaTorres.get(ID_CENTRO)
                     .getMediciones()
                     .stream()
                     .filter(ms ->
-                            (ms.getFechaHoraMedicion().getHour()>=9 && ms.getFechaHoraMedicion().getHour()<=18) &&
-                            ms.getFechaHoraMedicion().getDayOfWeek().getValue() != 6 && //excluimos los sabados
-                            ms.getFechaHoraMedicion().getDayOfWeek().getValue() != 7 && //excluimos los domingos
+                            ms.isHorarioLaboral() &&
+                            ms.isDiaDeSemana() &&
                             ms.getPromedioMedicion() > 0) //excluimos posibles valores invalidos
                     .collect(Collectors.toList());
 
-        TimeSeries ts = getTimeSeries(medicionSonoras);
-        System.out.println("--------------MEDICIONES TOMADAS EN EL CENTRO, EN HORARIOS LABORALES Y DIAS DE SEMANA ----------------------");
-        System.out.println("VALOR PROMEDIO: " + (ts.mean()));
-        System.out.println("MEDIA: " + (ts.median()));
-        System.out.println("DESVIO ESTANDAR: " + (ts.stdDeviation()));
+        TimeSeries tsHorarioLaboral = getTimeSeries(medicionSonorasHorarioLaboral);
+        System.out.println("--------------MEDICIONES TOMADAS EN EL CENTRO, L a V de 9 a 18 ----------------------");
+        System.out.println("VALOR PROMEDIO: " + (tsHorarioLaboral.mean()));
+        System.out.println("MEDIA: " + (tsHorarioLaboral.median()));
+        System.out.println("DESVIO ESTANDAR: " + (tsHorarioLaboral.stdDeviation()));
 
+        Plots.plot(tsHorarioLaboral.aggregate(TimePeriod.oneHour()), "CENTRO-L a V de 9 a 18", "Valor medido");
 
-        Plots.plot(ts.aggregate(TimePeriod.oneHour()), "CENTRO-DIAS Y HORARIOS LABORALES", "Valor medido");
+        List<MedicionSonora> medicionSonorasHorarioNoLaboral =
+                mapaTorres.get(ID_CENTRO)
+                        .getMediciones()
+                        .stream()
+                        .filter(ms ->
+                                !ms.isHorarioLaboral() &&
+                                ms.isDiaDeSemana() &&
+                                ms.getPromedioMedicion() > 0) //excluimos posibles valores invalidos
+                        .collect(Collectors.toList());
+
+        TimeSeries tsHorarioNoLaboral = getTimeSeries(medicionSonorasHorarioNoLaboral);
+        System.out.println("--------------MEDICIONES TOMADAS EN EL CENTRO, L a V antes de las 9 y despues de las 18 ----------------------");
+        System.out.println("VALOR PROMEDIO: " + (tsHorarioNoLaboral.mean()));
+        System.out.println("MEDIA: " + (tsHorarioNoLaboral.median()));
+        System.out.println("DESVIO ESTANDAR: " + (tsHorarioNoLaboral.stdDeviation()));
+
+        Plots.plot(tsHorarioNoLaboral.aggregate(TimePeriod.oneHour()), "CENTRO-L a V de 0 a 8 y de 19 a 23", "Valor medido");
     }
 
     private static void postTrabajoCercaDelCentro(Map<String, TorreMedicion> mapaTorres) {
@@ -88,10 +106,8 @@ public class ContaminacionSonora {
                         .getMediciones()
                         .stream()
                         .filter(ms ->
-                                (ms.getFechaHoraMedicion().getHour()<9 ||
-                                        ms.getFechaHoraMedicion().getHour()>18) &&
-                                        ms.getFechaHoraMedicion().getDayOfWeek().getValue() != 6 && //excluimos los sabados
-                                        ms.getFechaHoraMedicion().getDayOfWeek().getValue() != 7 && //excluimos los domingos
+                                ms.isHorarioLaboral() &&
+                                        ms.isDiaDeSemana() &&
                                         ms.getPromedioMedicion() > 0) //excluimos posibles valores invalidos
                         .collect(Collectors.toList());
 
@@ -112,10 +128,9 @@ public class ContaminacionSonora {
                         .getMediciones()
                         .stream()
                         .filter(ms ->
-                                (ms.getFechaHoraMedicion().getHour()>9 && ms.getFechaHoraMedicion().getHour()<18) &&
-                                ms.getFechaHoraMedicion().getMonth().getValue()<3 &&
-                                ms.getFechaHoraMedicion().getDayOfWeek().getValue() != 6 && //excluimos los sabados
-                                ms.getFechaHoraMedicion().getDayOfWeek().getValue() != 7 && //excluimos los domingos
+                                ms.isHorarioLaboral() &&
+                                ms.isVerano() &&
+                                ms.isDiaDeSemana() &&
                                 ms.getPromedioMedicion() > 0) //excluimos posibles valores invalidos
                         .collect(Collectors.toList());
 
@@ -135,21 +150,20 @@ public class ContaminacionSonora {
                         .getMediciones()
                         .stream()
                         .filter(ms ->
-                                (ms.getFechaHoraMedicion().getHour()>9 && ms.getFechaHoraMedicion().getHour()<18) &&
-                                        (ms.getFechaHoraMedicion().getMonth().getValue()<3 || ms.getFechaHoraMedicion().getMonth().getValue() == 12) &&
-                                        ms.getFechaHoraMedicion().getDayOfWeek().getValue() != 6 && //excluimos los sabados
-                                        ms.getFechaHoraMedicion().getDayOfWeek().getValue() != 7 && //excluimos los domingos
-                                        ms.getPromedioMedicion() > 0) //excluimos posibles valores invalidos
+                                ms.isHorarioLaboral() &&
+                                ms.isVerano() &&
+                                ms.isDiaDeSemana() &&
+                                ms.getPromedioMedicion() > 0) //excluimos posibles valores invalidos
                         .collect(Collectors.toList());
 
-        TimeSeries tsInvierno = getTimeSeries(medicionSonorasVerano);
+        TimeSeries tsVerano = getTimeSeries(medicionSonorasVerano);
         System.out.println("--------------MEDICIONES TOMADAS EN EL CENTRO, EN HORARIOS LABORALES, DIAS DE SEMANA DE VERANO----------------------");
-        System.out.println("VALOR PROMEDIO: " + (tsInvierno.mean()));
-        System.out.println("MEDIA: " + (tsInvierno.median()));
-        System.out.println("DESVIO ESTANDAR: " + (tsInvierno.stdDeviation()));
+        System.out.println("VALOR PROMEDIO: " + (tsVerano.mean()));
+        System.out.println("MEDIA: " + (tsVerano.median()));
+        System.out.println("DESVIO ESTANDAR: " + (tsVerano.stdDeviation()));
 
 
-        Plots.plot(tsInvierno.aggregate(TimePeriod.oneHour()), "CENTRO-DIA Y HORARIO LABORAL-VERANO", "Valor medido");
+        Plots.plot(tsVerano.aggregate(TimePeriod.oneHour()), "CENTRO-DIA Y HORARIO LABORAL-VERANO", "Valor medido");
 
 
         List<MedicionSonora> medicionSonorasInvierno =
@@ -157,21 +171,21 @@ public class ContaminacionSonora {
                         .getMediciones()
                         .stream()
                         .filter(ms ->
-                                (ms.getFechaHoraMedicion().getHour()>9 && ms.getFechaHoraMedicion().getHour()<18) &&
-                                        (ms.getFechaHoraMedicion().getMonth().getValue()<3 || ms.getFechaHoraMedicion().getMonth().getValue() == 12) &&
-                                        ms.getFechaHoraMedicion().getDayOfWeek().getValue() != 6 && //excluimos los sabados
-                                        ms.getFechaHoraMedicion().getDayOfWeek().getValue() != 7 && //excluimos los domingos
-                                        ms.getPromedioMedicion() > 0) //excluimos posibles valores invalidos
+                                ms.isHorarioLaboral() &&
+                                ms.isInvierno() &&
+                                ms.isDiaDeSemana() &&
+                                ms.getPromedioMedicion() > 0) //excluimos posibles valores invalidos
                         .collect(Collectors.toList());
 
-        TimeSeries tsVerano = getTimeSeries(medicionSonorasInvierno);
+        TimeSeries tsInvierno
+                = getTimeSeries(medicionSonorasInvierno);
         System.out.println("--------------MEDICIONES TOMADAS CERCA DEL CENTRO, EN DE HORARIOS LABORALES, DIAS DE SEMANA DE INVIERNO----------------------");
-        System.out.println("VALOR PROMEDIO: " + (tsVerano.mean()));
-        System.out.println("MEDIA: " + (tsVerano.median()));
-        System.out.println("DESVIO ESTANDAR: " + (tsVerano.stdDeviation()));
+        System.out.println("VALOR PROMEDIO: " + (tsInvierno.mean()));
+        System.out.println("MEDIA: " + (tsInvierno.median()));
+        System.out.println("DESVIO ESTANDAR: " + (tsInvierno.stdDeviation()));
 
 
-        Plots.plot(tsVerano.aggregate(TimePeriod.oneHour()), "CENTRO-DIA Y HORARIO LABORAL-INVIERNO", "Valor medido");
+        Plots.plot(tsInvierno.aggregate(TimePeriod.oneHour()), "CENTRO-DIA Y HORARIO LABORAL-INVIERNO", "Valor medido");
 
 
     }
